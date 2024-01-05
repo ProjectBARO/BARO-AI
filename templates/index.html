@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Prediction</title>
+</head>
+<body>
+    <h1>Enter Video Path</h1>
+    <form action="/predict" method="post">
+        <input type="text" name="video_path" placeholder="Enter video path">
+        <input type="submit" value="Predict">
+    </form>
+
+    {% if result is not none %}
+    <h2>Prediction Result:</h2>
+    <p>{{ result }}</p>
+    {% endif %}
+</body>
+</html>
