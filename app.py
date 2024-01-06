@@ -1,16 +1,20 @@
 import os
 import requests
 import tempfile
+import tensorflow as tf
 from flask import Flask, render_template, request
 import cv2
 import numpy as np
-import tensorflow as tf
 
+
+
+tf.config.run_functions_eagerly(True)
 
 app = Flask(__name__)
 
-# 모델 불러오기
+
 model = tf.keras.models.load_model('CNN_model.h5')
+model.compile(run_eagerly=True)
 
 def extract_frames(video_file, interval=5):
     cap = cv2.VideoCapture(video_file)

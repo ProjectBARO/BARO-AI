@@ -2,11 +2,19 @@
 <html>
 <head>
     <title>Video Prediction</title>
+    <script>
+        function submitForm(event) {
+            event.preventDefault();
+            var videoUrl = document.getElementById('video_url').value;
+            var encodedUrl = encodeURIComponent(videoUrl);
+            window.location.href = '/predict?video_url=' + encodedUrl;
+        }
+    </script>
 </head>
 <body>
-    <h1>Enter Video Path</h1>
-    <form action="/predict" method="post">
-        <input type="text" name="video_path" placeholder="Enter video path">
+    <h1>Enter Video URL</h1>
+    <form onsubmit="submitForm(event)">
+        <input type="text" id="video_url" placeholder="Enter video URL">
         <input type="submit" value="Predict">
     </form>
 
