@@ -1,8 +1,11 @@
-from flask import Flask, render_template
+import os
+import requests
+import tempfile
+from flask import Flask, render_template, request
 import cv2
 import numpy as np
 import tensorflow as tf
-import os
+
 
 app = Flask(__name__)
 
@@ -27,18 +30,34 @@ def extract_frames(video_file, interval=5):
     cap.release()
     return np.array(images)
 
+def download_video(url):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
+            tmp_file.write(response.content)
+            return tmp_file.name
+    return None
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/predict', methods=['GET', 'POST'])
 def predict():
-    video_path = 'pose_estimation_wrong.mp4' 
-
     try:
-        images = extract_frames(video_path)
+        video_url = request.args.get('video_url')
+        if not video_url:
+            raise Exception("No video URL provided")
+
+        video_file = download_video(video_url)
+        if video_file is None:
+            raise Exception("Video download failed")
+
+        images = extract_frames(video_file)
         predictions = model.predict(images)
         result = np.argmax(predictions, axis=1)
+
+        os.remove(video_file)
 
         return render_template('index.html', result=result.tolist())
 
@@ -46,4 +65,4 @@ def predict():
         return render_template('index.html', result=str(e))
 
 if __name__ == '__main__':
-    app.run('0.0.0.0', port = 5000, debug=True)
+    app.run('0.0.0.0', port=5000, debug=True)
