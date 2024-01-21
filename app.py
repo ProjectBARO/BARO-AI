@@ -6,24 +6,40 @@ import cv2
 import numpy as np
 from flask import Flask, render_template, request, Response
 import json
+import mediapipe as mp
+import math
 
 
-# TensorFlow Eager Execution 활성화
 tf.config.run_functions_eagerly(True)
 
 app = Flask(__name__)
 
-# 모델 불러오기 및 컴파일
 model = tf.keras.models.load_model('CNN_model.h5')
 model.compile(run_eagerly=True)
 
+def calculate_acromion_distance_cm(left_shoulder, left_ear, frame_width, frame_height, distance_to_camera_cm=50, camera_fov_degrees=60):
+    if left_shoulder is None or left_ear is None:
+        return None
+    # 픽셀 단위로 변환
+    left_shoulder_pixel = [left_shoulder[0] * frame_width, left_shoulder[1] * frame_height]
+    left_ear_pixel = [left_ear[0] * frame_width, left_ear[1] * frame_height]
+    pixel_distance = np.sqrt((left_shoulder_pixel[0] - left_ear_pixel[0])**2 + (left_shoulder_pixel[1] - left_ear_pixel[1])**2)
+    real_width_cm = 2 * distance_to_camera_cm * np.tan(np.radians(camera_fov_degrees / 2))
+    cm_per_pixel = real_width_cm / frame_width
+    distance_cm = pixel_distance * cm_per_pixel
+    return distance_cm
+
 def extract_frames(video_file, interval=5):
     cap = cv2.VideoCapture(video_file)
-    frameRate = cap.get(5)  # 프레임 5초 단위
+    frameRate = cap.get(5)
     images = []
+    landmarks_info = []
+
+    mp_pose = mp.solutions.pose
+    pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
 
     while cap.isOpened():
-        frameId = cap.get(1)  
+        frameId = cap.get(1)
         ret, frame = cap.read()
         if not ret:
             break
@@ -32,8 +48,19 @@ def extract_frames(video_file, interval=5):
             img = img / 255.0
             images.append(img)
 
+            results = pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            if results.pose_landmarks:
+                left_shoulder = [results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_SHOULDER].x,
+                                 results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_SHOULDER].y]
+                left_ear = [results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].x,
+                            results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].y]
+                acromion_distance_cm = calculate_acromion_distance_cm(left_shoulder, left_ear, frame.shape[1], frame.shape[0])
+                landmarks_info.append((left_shoulder, left_ear, acromion_distance_cm))
+            else:
+                landmarks_info.append((None, None, None))
+
     cap.release()
-    return np.array(images)
+    return np.array(images), landmarks_info
 
 def download_video(url):
     response = requests.get(url)
@@ -57,7 +84,6 @@ def calculate_posture_ratios(predictions):
     return hunched_ratio, normal_ratio
 
 def calculate_scores(predictions_proba):
-
     scores = np.max(predictions_proba, axis=1) * 100  
     return scores.tolist()
 
@@ -76,7 +102,7 @@ def predict():
         if video_file is None:
             raise ValueError("Video download failed")
 
-        images = extract_frames(video_file)
+        images, landmarks_info = extract_frames(video_file)
         predictions_proba = model.predict(images)
         result = np.argmax(predictions_proba, axis=1)
         scores = calculate_scores(predictions_proba)
@@ -85,12 +111,12 @@ def predict():
 
         os.remove(video_file)
 
-        
         response_data = json.dumps({
             'result': result.tolist(),
             'hunched_ratio': hunched_ratio,
             'normal_ratio': normal_ratio,
-            'scores': scores
+            'scores': scores,
+            'landmarks_info': landmarks_info
         }, indent=4)
 
         return Response(response_data, mimetype='application/json')
@@ -99,6 +125,5 @@ def predict():
         error_message = json.dumps({'error': str(e)}, indent=4)
         return Response(error_message, status=400, mimetype='application/json')
 
-
 if __name__ == '__main__':
-    app.run('0.0.0.0', port = 5000, debug=True)
+    app.run('0.0.0.0', port=5000, debug=True)
