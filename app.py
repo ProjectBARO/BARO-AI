@@ -9,7 +9,6 @@ import json
 import mediapipe as mp
 import math
 
-
 tf.config.run_functions_eagerly(True)
 
 app = Flask(__name__)
@@ -20,7 +19,6 @@ model.compile(run_eagerly=True)
 def calculate_acromion_distance_cm(left_shoulder, left_ear, frame_width, frame_height, distance_to_camera_cm=50, camera_fov_degrees=60):
     if left_shoulder is None or left_ear is None:
         return None
-    # 픽셀 단위로 변환
     left_shoulder_pixel = [left_shoulder[0] * frame_width, left_shoulder[1] * frame_height]
     left_ear_pixel = [left_ear[0] * frame_width, left_ear[1] * frame_height]
     pixel_distance = np.sqrt((left_shoulder_pixel[0] - left_ear_pixel[0])**2 + (left_shoulder_pixel[1] - left_ear_pixel[1])**2)
@@ -28,6 +26,17 @@ def calculate_acromion_distance_cm(left_shoulder, left_ear, frame_width, frame_h
     cm_per_pixel = real_width_cm / frame_width
     distance_cm = pixel_distance * cm_per_pixel
     return distance_cm
+
+def calculate_angle(p1, p2, p3):
+    angle = math.degrees(math.atan2(p3[1] - p2[1], p3[0] - p2[0]) - math.atan2(p1[1] - p2[1], p1[0] - p2[0]))
+    if angle < 0:
+        angle += 360
+    return angle
+
+def adjust_angle(angle):
+    if angle > 180:
+        angle = 360 - angle
+    return angle
 
 def extract_frames(video_file, interval=5):
     cap = cv2.VideoCapture(video_file)
@@ -54,10 +63,14 @@ def extract_frames(video_file, interval=5):
                                  results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_SHOULDER].y]
                 left_ear = [results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].x,
                             results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].y]
+                neck = [results.pose_landmarks.landmark[mp_pose.PoseLandmark.NOSE].x,
+                        results.pose_landmarks.landmark[mp_pose.PoseLandmark.NOSE].y]
                 acromion_distance_cm = calculate_acromion_distance_cm(left_shoulder, left_ear, frame.shape[1], frame.shape[0])
-                landmarks_info.append((left_shoulder, left_ear, acromion_distance_cm))
+                angle = calculate_angle(neck, left_ear, left_shoulder)
+                adjusted_angle = adjust_angle(angle)
+                landmarks_info.append((left_shoulder, left_ear, acromion_distance_cm, adjusted_angle))
             else:
-                landmarks_info.append((None, None, None))
+                landmarks_info.append((None, None, None, None))
 
     cap.release()
     return np.array(images), landmarks_info
