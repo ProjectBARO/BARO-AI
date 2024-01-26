@@ -3,5 +3,4 @@ opencv-python-headless
 tensorflow
 numpy
 requests
-gunicorn
 mediapipe
