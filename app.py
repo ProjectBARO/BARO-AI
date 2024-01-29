@@ -21,7 +21,7 @@ model.compile(run_eagerly=True)
 
 
 
-def calculate_acromion_distance_cm(left_shoulder, left_ear, frame_width, frame_height, distance_to_camera_cm=50, camera_fov_degrees=60):
+def calculate_acromion_distance_cm(left_shoulder, left_ear, frame_width, frame_height, distance_to_camera_cm=50, camera_fov_degrees=45):
     if left_shoulder is None or left_ear is None:
         return None
     left_shoulder_pixel = [left_shoulder[0] * frame_width, left_shoulder[1] * frame_height]
