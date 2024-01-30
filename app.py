@@ -34,10 +34,15 @@ def calculate_acromion_distance_cm(left_shoulder, left_ear, frame_width, frame_h
 
 
 
-def calculate_angle(p1, p2, p3):
-    angle = math.degrees(math.atan2(p3[1] - p2[1], p3[0] - p2[0]) - math.atan2(p1[1] - p2[1], p1[0] - p2[0]))
+def calculate_angle(p1, p2):
+    
+    angle = math.degrees(math.atan2(p2[1] - p1[1], p2[0] - p1[0]))
     if angle < 0:
         angle += 360
+
+    if angle > 180:
+        angle = 360 - angle
+
     return angle
 
 
@@ -92,17 +97,23 @@ def extract_frames(video_file, interval=5):
                                  results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_SHOULDER].y]
                 left_ear = [results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].x,
                             results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].y]
-                neck = [results.pose_landmarks.landmark[mp_pose.PoseLandmark.NOSE].x,
-                        results.pose_landmarks.landmark[mp_pose.PoseLandmark.NOSE].y]
+                
+                # Acromion distance calculation
                 acromion_distance_cm = calculate_acromion_distance_cm(left_shoulder, left_ear, frame.shape[1], frame.shape[0])
-                angle = calculate_angle(neck, left_ear, left_shoulder)
+
+                # Angle calculation using left_ear and left_shoulder
+                angle = calculate_angle(left_ear, left_shoulder)
                 adjusted_angle = adjust_angle(angle)
+
+                # Evaluating the posture condition
                 angle_status = evaluate_angle_condition(adjusted_angle)
                 landmarks_info.append((left_shoulder, left_ear, acromion_distance_cm, adjusted_angle))
                 angle_conditions.append(angle_status)
+
     status_frequencies = Counter(angle_conditions)
     cap.release()
     return np.array(images), landmarks_info, dict(status_frequencies)
+
 
 
 
