@@ -20,17 +20,24 @@ model = tf.keras.models.load_model('CNN_model.h5')
 model.compile(run_eagerly=True)
 
 
+### fix
 
-def calculate_acromion_distance_cm(left_shoulder, left_ear, frame_width, frame_height, distance_to_camera_cm=60, camera_fov_degrees=25):
-    if left_shoulder is None or left_ear is None:
+def calculate_vertical_distance_cm(landmark1, landmark2, frame_height, distance_to_camera_cm=60, camera_fov_degrees=25):
+    if landmark1 is None or landmark2 is None:
         return None
-    left_shoulder_pixel = [left_shoulder[0] * frame_width, left_shoulder[1] * frame_height]
-    left_ear_pixel = [left_ear[0] * frame_width, left_ear[1] * frame_height]
-    pixel_distance = np.sqrt((left_shoulder_pixel[0] - left_ear_pixel[0])**2 + (left_shoulder_pixel[1] - left_ear_pixel[1])**2)
-    real_width_cm = 2 * distance_to_camera_cm * np.tan(np.radians(camera_fov_degrees / 2))
-    cm_per_pixel = real_width_cm / frame_width
-    distance_cm = pixel_distance * cm_per_pixel
-    return distance_cm
+    
+    landmark1_pixel = landmark1[1] * frame_height
+    landmark2_pixel = landmark2[1] * frame_height
+    
+    pixel_distance = np.abs(landmark1_pixel - landmark2_pixel)
+    
+    real_height_cm = 2 * distance_to_camera_cm * np.tan(np.radians(camera_fov_degrees / 2))
+    
+    cm_per_pixel = real_height_cm / frame_height
+    
+    vertical_distance_cm = pixel_distance * cm_per_pixel
+    
+    return vertical_distance_cm
 
 
 
@@ -57,17 +64,18 @@ def adjust_angle(angle):
 def evaluate_angle_condition(angle): ### 거북목 상태.
     adjusted_angle = adjust_angle(angle)
 
-    if 0 <= adjusted_angle <= 15:
+    if 165 <= adjusted_angle <= 180:
         return 'Fine'
     
-    elif 15 < adjusted_angle <= 30:
+    elif 150 <= adjusted_angle < 165:
         return 'Danger'
     
-    elif 30 < adjusted_angle <= 45:
+    elif 135 <= adjusted_angle < 150:
         return 'Serious'
     
-    elif adjusted_angle > 45:
+    elif adjusted_angle < 135:
         return 'Very Serious'
+
 
 
 
@@ -98,22 +106,21 @@ def extract_frames(video_file, interval=5):
                 left_ear = [results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].x,
                             results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].y]
                 
-                # Acromion distance calculation
-                acromion_distance_cm = calculate_acromion_distance_cm(left_shoulder, left_ear, frame.shape[1], frame.shape[0])
+                # Vertical distance calculation between left ear and left shoulder
+                vertical_distance_cm = calculate_vertical_distance_cm(left_shoulder, left_ear, frame.shape[0])
 
-                # Angle calculation using left_ear and left_shoulder
+                # Angle calculation using left ear and left shoulder
                 angle = calculate_angle(left_ear, left_shoulder)
                 adjusted_angle = adjust_angle(angle)
 
-                # Evaluating the posture condition
+                # Evaluating the posture condition based on the angle
                 angle_status = evaluate_angle_condition(adjusted_angle)
-                landmarks_info.append((left_shoulder, left_ear, acromion_distance_cm, adjusted_angle))
+                landmarks_info.append((left_shoulder, left_ear, vertical_distance_cm, adjusted_angle))
                 angle_conditions.append(angle_status)
 
     status_frequencies = Counter(angle_conditions)
     cap.release()
     return np.array(images), landmarks_info, dict(status_frequencies)
-
 
 
 
