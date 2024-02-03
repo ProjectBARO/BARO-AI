@@ -16,7 +16,7 @@ tf.config.run_functions_eagerly(True)
 
 app = Flask(__name__)
 
-model = tf.keras.models.load_model('CNN_model.h5')
+model = tf.keras.models.load_model('final_baro_model.h5')
 model.compile(run_eagerly=True)
 
 
