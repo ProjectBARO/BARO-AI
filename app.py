@@ -77,11 +77,9 @@ def evaluate_angle_condition(angle): ### 거북목 상태.
         return 'Very Serious'
 
 
-
-
 def extract_frames(video_file, interval=5):
     cap = cv2.VideoCapture(video_file)
-    frameRate = cap.get(5)
+    frameRate = cap.get(5) 
     images = []
     landmarks_info = []
     angle_conditions = []
@@ -90,14 +88,20 @@ def extract_frames(video_file, interval=5):
     pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
 
     while cap.isOpened():
-        frameId = cap.get(1)
-        ret, frame = cap.read()
+        frameId = cap.get(1) 
+        ret, frame = cap.read() 
         if not ret:
             break
         if frameId % (frameRate * interval) == 0:
-            img = cv2.resize(frame, (28, 28))
-            img = img / 255.0
-            images.append(img)
+        
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+            resized_img = cv2.resize(gray_frame, (28, 28))
+            
+            normalized_img = resized_img / 255.0
+            
+            normalized_img = np.stack((normalized_img,)*3, axis=-1)
+            images.append(normalized_img)
 
             results = pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             if results.pose_landmarks:
@@ -106,14 +110,11 @@ def extract_frames(video_file, interval=5):
                 left_ear = [results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].x,
                             results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].y]
                 
-                # Vertical distance calculation between left ear and left shoulder
                 vertical_distance_cm = calculate_vertical_distance_cm(left_shoulder, left_ear, frame.shape[0])
 
-                # Angle calculation using left ear and left shoulder
                 angle = calculate_angle(left_ear, left_shoulder)
                 adjusted_angle = adjust_angle(angle)
 
-                # Evaluating the posture condition based on the angle
                 angle_status = evaluate_angle_condition(adjusted_angle)
                 landmarks_info.append((left_shoulder, left_ear, vertical_distance_cm, adjusted_angle))
                 angle_conditions.append(angle_status)
