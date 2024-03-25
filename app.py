@@ -12,16 +12,19 @@ from collections import Counter
 
 
 
-tf.config.run_functions_eagerly(True)
+#tf.config.run_functions_eagerly(True)
 
 app = Flask(__name__)
 
 model = tf.keras.models.load_model('final_baro_model.h5')
-model.compile(run_eagerly=True)
+#model.compile(run_eagerly=True)
 
 
-### fix
+mp_pose = mp.solutions.pose
+pose = mp_pose.Pose(static_image_mode=  True, min_detection_confidence = 0.5)
 
+
+####
 def calculate_vertical_distance_cm(landmark1, landmark2, frame_height, distance_to_camera_cm=60, camera_fov_degrees=25):
     if landmark1 is None or landmark2 is None:
         return None
@@ -61,7 +64,7 @@ def adjust_angle(angle):
 
 
 
-def evaluate_angle_condition(angle): ### 거북목 상태.
+def evaluate_angle_condition(angle): ### 거북목 상태. ####
     adjusted_angle = adjust_angle(angle)
 
     if 165 <= adjusted_angle <= 180:
@@ -84,8 +87,8 @@ def extract_frames(video_file, interval=5):
     landmarks_info = []
     angle_conditions = []
 
-    mp_pose = mp.solutions.pose
-    pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+    #mp_pose = mp.solutions.pose
+    #pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
 
     while cap.isOpened():
         frameId = cap.get(1) 
@@ -190,3 +193,6 @@ def predict():
 
 if __name__ == '__main__':
     app.run('0.0.0.0', port=5000, debug=True)
+
+
+### ryuchanghoon/baro-lower-opti:latest  ==> not apply multi stage && not .dockerignore
