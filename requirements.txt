@@ -4,3 +4,6 @@ tensorflow
 numpy
 requests
 mediapipe
+fastapi
+uvicorn
+aiohttp
