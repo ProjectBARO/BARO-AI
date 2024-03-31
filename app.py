@@ -1,27 +1,35 @@
-import os
-import requests
-import tempfile
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.requests import Request
 import tensorflow as tf
 import cv2
 import numpy as np
-from flask import Flask, render_template, request, Response
+import aiohttp  
+import tempfile
 import json
 import mediapipe as mp
 import math
 from collections import Counter
-
+import os
+import uvicorn
 
 
 #tf.config.run_functions_eagerly(True)
 
-app = Flask(__name__)
+app = FastAPI()
 
 model = tf.keras.models.load_model('final_baro_model.h5')
 #model.compile(run_eagerly=True)
 
 
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(static_image_mode=  True, min_detection_confidence = 0.5)
+pose = mp_pose.Pose(static_image_mode= True, min_detection_confidence = 0.5)
+
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 
 ####
@@ -42,8 +50,7 @@ def calculate_vertical_distance_cm(landmark1, landmark2, frame_height, distance_
     
     return vertical_distance_cm
 
-
-
+###
 def calculate_angle(p1, p2):
     
     angle = math.degrees(math.atan2(p2[1] - p1[1], p2[0] - p1[0]))
@@ -56,14 +63,14 @@ def calculate_angle(p1, p2):
     return angle
 
 
-
+###
 def adjust_angle(angle):
     if angle > 180:
         angle = 360 - angle
     return angle
 
 
-
+###
 def evaluate_angle_condition(angle): ### 거북목 상태. ####
     adjusted_angle = adjust_angle(angle)
 
@@ -128,16 +135,18 @@ def extract_frames(video_file, interval=5):
 
 
 
-def download_video(url):
-    response = requests.get(url)
-    if response.status_code == 200:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
-            tmp_file.write(response.content)
-            return tmp_file.name
+async def download_video(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
+                    content = await response.read()  
+                    tmp_file.write(content)
+                    return tmp_file.name
     return None
 
 
-
+###
 def calculate_posture_ratios(predictions):
     hunched_posture_label = 0
     normal_posture_label = 1
@@ -151,49 +160,45 @@ def calculate_posture_ratios(predictions):
 
     return hunched_ratio, normal_ratio
 
-
+###
 def calculate_scores(predictions_proba):
     scores = np.max(predictions_proba, axis=1) * 100  
     return scores.tolist()
 
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+@app.get("/")
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.route('/predict', methods=['GET', 'POST'])
-def predict():
+
+@app.post("/predict")
+async def predict(request: Request, video_url: str = Form(...)):
+    
     try:
-        video_url = request.args.get('video_url') if request.method == 'GET' else request.form.get('video_url')
-        if not video_url:
-            raise ValueError("No video URL provided")
-        video_file = download_video(video_url)
+        video_file = await download_video(video_url)
         if video_file is None:
-            raise ValueError("Video download failed")
-        images, landmarks_info, status_frequencies = extract_frames(video_file)
+            raise HTTPException(status_code=400, detail="Video download failed")
+        images, landmarks_info, status_frequencies = await extract_frames(video_file)
         predictions_proba = model.predict(images)
         result = np.argmax(predictions_proba, axis=1)
         scores = calculate_scores(predictions_proba)
         hunched_ratio, normal_ratio = calculate_posture_ratios(result)
-        os.remove(video_file)
-        response_data = json.dumps({
+        os.remove(video_file)  # 파일 삭제
+        return JSONResponse(content={
             'result': result.tolist(),
             'hunched_ratio': hunched_ratio,
             'normal_ratio': normal_ratio,
             'scores': scores,
             'landmarks_info': landmarks_info,
             'status_frequencies': status_frequencies
-        }, indent=4)
-        return Response(response_data, mimetype='application/json')
+        })
     except Exception as e:
-        error_message = json.dumps({'error': str(e)}, indent=4)
-        return Response(error_message, status=400, mimetype='application/json')
+        return JSONResponse(content={'error': str(e)}, status_code=400)
 
 
-if __name__ == '__main__':
-    app.run('0.0.0.0', port=5000, debug=True)
-
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port= 8000)
 
 ### ryuchanghoon/baro-lower-opti:latest  ==> not apply multi stage && not .dockerignore
 
