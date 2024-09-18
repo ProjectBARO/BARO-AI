@@ -179,7 +179,9 @@ async def predict(request: Request, video_url: str = Form(...)):
         video_file = await download_video(video_url)
         if video_file is None:
             raise HTTPException(status_code=400, detail="Video download failed")
-        images, landmarks_info, status_frequencies = await extract_frames(video_file)
+        #images, landmarks_info, status_frequencies = await extract_frames(video_file)
+        images, landmarks_info, status_frequencies = extract_frames(video_file)
+        ##
         predictions_proba = model.predict(images)
         result = np.argmax(predictions_proba, axis=1)
         scores = calculate_scores(predictions_proba)
@@ -205,3 +207,5 @@ if __name__ == "__main__":
 ### ryuchanghoon/baro-lower-opti-re:latest ==> apply multi stage && .dockerignore
     
 ### ryuchanghoon/baro-fix-fastapi:latest ==> Convert from Flask to Fast API
+
+### ryuchanghoon/baro-refix:latest ==> 아직 허브까지는 push 안한거

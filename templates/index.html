@@ -3,24 +3,53 @@
 <head>
     <title>Video Prediction</title>
     <script>
-        function submitForm(event) {
+        async function submitForm(event) {
             event.preventDefault();
             var videoUrl = document.getElementById('video_url').value;
-            var encodedUrl = encodeURIComponent(videoUrl);
-            window.location.href = '/predict?video_url=' + encodedUrl;
+            
+            const formData = new FormData();
+            formData.append('video_url', videoUrl);
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    
+                    document.getElementById('result').innerHTML = `
+                        <h2>Prediction Result:</h2>
+                        <p><strong>Result:</strong> ${result.result.join(', ')}</p>
+                        <p><strong>Hunched Ratio:</strong> ${result.hunched_ratio}%</p>
+                        <p><strong>Normal Ratio:</strong> ${result.normal_ratio}%</p>
+                        <p><strong>Scores:</strong> ${result.scores.join(', ')}</p>
+                        <p><strong>Landmarks Info:</strong> ${result.landmarks_info.map(info => `
+                            [Left Shoulder: (${info[0][0].toFixed(2)}, ${info[0][1].toFixed(2)})], 
+                            [Left Ear: (${info[1][0].toFixed(2)}, ${info[1][1].toFixed(2)})], 
+                            [Vertical Distance: ${info[2].toFixed(2)}cm], 
+                            [Angle: ${info[3].toFixed(2)}°]
+                        `).join('<br>')}</p>
+                        <p><strong>Status Frequencies:</strong> ${Object.entries(result.status_frequencies).map(([key, value]) => `${key}: ${value}`).join(', ')}</p>
+                    `;
+                } else {
+                    document.getElementById('result').innerHTML = '<p>Error: ' + result.detail + '</p>';
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<p>Request failed: ' + error.message + '</p>';
+            }
         }
     </script>
 </head>
 <body>
     <h1>Enter Video URL</h1>
     <form onsubmit="submitForm(event)">
-        <input type="text" id="video_url" placeholder="Enter video URL">
+        <input type="text" id="video_url" placeholder="Enter video URL" required>
         <input type="submit" value="Predict">
     </form>
 
-    {% if result is not none %}
-    <h2>Prediction Result:</h2>
-    <p>{{ result }}</p>
-    {% endif %}
+    <div id="result"></div>
+
 </body>
 </html>

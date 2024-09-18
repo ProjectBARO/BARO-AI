@@ -7,3 +7,4 @@ mediapipe
 fastapi
 uvicorn
 aiohttp
+python-multipart
