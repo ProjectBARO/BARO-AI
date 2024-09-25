@@ -2,42 +2,55 @@
 <html>
 <head>
     <title>Video Prediction</title>
+    
     <script>
         async function submitForm(event) {
-            event.preventDefault();
-            var videoUrl = document.getElementById('video_url').value;
-            
+            event.preventDefault();  
+            document.getElementById('loading').style.display = 'block';  
+            document.getElementById('result').innerHTML = '';  
+
+            var videoUrl = document.getElementById('video_url').value;  
             const formData = new FormData();
-            formData.append('video_url', videoUrl);
+            formData.append('video_url', videoUrl);  
 
             try {
-                const response = await fetch('/predict', {
+                const response = await fetch(`${window.location.origin}/predict`, {
                     method: 'POST',
                     body: formData
                 });
 
-                const result = await response.json();
-                if (response.ok) {
-                    
+                const result = await response.json();  
+                document.getElementById('loading').style.display = 'none';  
+
+                if (response.ok && result.result && result.landmarks_info) {
+
+                    const resultString = result.result ? JSON.stringify(result.result, null, 4) : 'No data';
+
+                    const scoresString = result.scores ? JSON.stringify(result.scores, null, 4) : 'No data';
+
+                    const landmarksString = result.landmarks_info && result.landmarks_info.length > 0 
+                        ? JSON.stringify(result.landmarks_info, null, 4)
+                        : 'No landmarks info';
+
+                    const statusFrequenciesString = result.status_frequencies ? JSON.stringify(result.status_frequencies, null, 4) : 'No status frequencies';
+
                     document.getElementById('result').innerHTML = `
                         <h2>Prediction Result:</h2>
-                        <p><strong>Result:</strong> ${result.result.join(', ')}</p>
-                        <p><strong>Hunched Ratio:</strong> ${result.hunched_ratio}%</p>
-                        <p><strong>Normal Ratio:</strong> ${result.normal_ratio}%</p>
-                        <p><strong>Scores:</strong> ${result.scores.join(', ')}</p>
-                        <p><strong>Landmarks Info:</strong> ${result.landmarks_info.map(info => `
-                            [Left Shoulder: (${info[0][0].toFixed(2)}, ${info[0][1].toFixed(2)})], 
-                            [Left Ear: (${info[1][0].toFixed(2)}, ${info[1][1].toFixed(2)})], 
-                            [Vertical Distance: ${info[2].toFixed(2)}cm], 
-                            [Angle: ${info[3].toFixed(2)}°]
-                        `).join('<br>')}</p>
-                        <p><strong>Status Frequencies:</strong> ${Object.entries(result.status_frequencies).map(([key, value]) => `${key}: ${value}`).join(', ')}</p>
+                        <pre><strong>Result:</strong> ${resultString}</pre>
+                        <pre><strong>Hunched Ratio:</strong> ${result.hunched_ratio || 'N/A'}%</pre>
+                        <pre><strong>Normal Ratio:</strong> ${result.normal_ratio || 'N/A'}%</pre>
+                        <pre><strong>Scores:</strong> ${scoresString}</pre>
+                        <pre><strong>Landmarks Info:</strong><br>${landmarksString}</pre>
+                        <pre><strong>Status Frequencies:</strong> ${statusFrequenciesString}</pre>
                     `;
                 } else {
-                    document.getElementById('result').innerHTML = '<p>Error: ' + result.detail + '</p>';
+            
+                    document.getElementById('result').innerHTML = '<p>Error: Missing data in server response.</p>';
                 }
             } catch (error) {
-                document.getElementById('result').innerHTML = '<p>Request failed: ' + error.message + '</p>';
+            
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('result').innerHTML = `<p>Request failed: ${error.message}</p>`;
             }
         }
     </script>
@@ -49,6 +62,10 @@
         <input type="submit" value="Predict">
     </form>
 
+   
+    <div id="loading">Processing your request...</div>
+    
+    
     <div id="result"></div>
 
 </body>
