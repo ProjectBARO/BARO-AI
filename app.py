@@ -140,6 +140,7 @@ def calculate_scores(predictions_proba):
     scores = np.max(predictions_proba, axis=1) * 100  
     return scores.tolist()
 
+
 @app.get("/")
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -179,6 +180,47 @@ async def predict(request: Request, video_url: str = Form(...)):
         })
     except Exception as e:
         return JSONResponse(content={'error': str(e)}, status_code=400)
+
+
+
+@app.post("/predict/v2")
+async def predict_v2(video_data: dict):
+    try:
+        video_url = video_data.get("video_url")
+        if not video_url:
+            raise HTTPException(status_code=400, detail="Missing video_url in request body")
+        
+        video_file = await download_video(video_url)
+        if video_file is None:
+            raise HTTPException(status_code=400, detail="Video download failed")
+
+        images, landmarks_info, status_frequencies = extract_frames(video_file)
+
+        predictions_proba = model.predict(images)
+        result = np.argmax(predictions_proba, axis=1)
+        scores = calculate_scores(predictions_proba)
+        hunched_ratio, normal_ratio = calculate_posture_ratios(result)
+
+        os.remove(video_file)
+
+        return JSONResponse(content={
+            'result': result.tolist(),
+            'hunched_ratio': hunched_ratio,
+            'normal_ratio': normal_ratio,
+            'scores': scores,
+            'landmarks_info': [
+                {
+                    'left_shoulder': {'x': info[0][0], 'y': info[0][1]},
+                    'left_ear': {'x': info[1][0], 'y': info[1][1]},
+                    'vertical_distance_cm': info[2],
+                    'angle': info[3]
+                } for info in landmarks_info
+            ],
+            'status_frequencies': status_frequencies
+        })
+    except Exception as e:
+        return JSONResponse(content={'error': str(e)}, status_code=400)
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -10,13 +10,18 @@
             document.getElementById('result').innerHTML = '';  
 
             var videoUrl = document.getElementById('video_url').value;  
-            const formData = new FormData();
-            formData.append('video_url', videoUrl);  
+            
+            const requestBody = {
+                "video_url": videoUrl
+            };
 
             try {
-                const response = await fetch(`${window.location.origin}/predict`, {
+                const response = await fetch(`${window.location.origin}/predict/v2`, {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json' 
+                    },
+                    body: JSON.stringify(requestBody)
                 });
 
                 const result = await response.json();  
@@ -48,7 +53,6 @@
                     document.getElementById('result').innerHTML = '<p>Error: Missing data in server response.</p>';
                 }
             } catch (error) {
-            
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('result').innerHTML = `<p>Request failed: ${error.message}</p>`;
             }
@@ -56,17 +60,13 @@
     </script>
 </head>
 <body>
-    <h1>Enter Video URL</h1>
+    <h1>Enter Video URL for Prediction (JSON)</h1>
     <form onsubmit="submitForm(event)">
         <input type="text" id="video_url" placeholder="Enter video URL" required>
         <input type="submit" value="Predict">
     </form>
 
-   
-    <div id="loading">Processing your request...</div>
-    
-    
+    <div id="loading" style="display:none;">Processing your request...</div> 
     <div id="result"></div>
-
 </body>
 </html>
