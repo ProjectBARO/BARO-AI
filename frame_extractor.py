@@ -24,20 +24,14 @@ def calculate_angle(p1, p2):
         angle += 360
     return angle
 
-def adjust_angle(angle):
-    if angle > 180:
-        angle = 360 - angle
-    return angle
-
 def evaluate_angle_condition(angle):
-    adjusted_angle = adjust_angle(angle)
-    if 165 <= adjusted_angle <= 180:
+    if 80 <= angle <= 100:
         return 'Fine'
-    elif 150 <= adjusted_angle < 165:
+    elif 70 <= angle < 80 or 100 < angle <= 110:
         return 'Danger'
-    elif 135 <= adjusted_angle < 150:
+    elif 60 <= angle < 70 or 110 < angle <= 120:
         return 'Serious'
-    elif adjusted_angle < 135:
+    else:
         return 'Very Serious'
 
 def extract_frames(video_file: str, interval: int = 5):
@@ -67,13 +61,13 @@ def extract_frames(video_file: str, interval: int = 5):
                             results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_EAR].y]
 
                 vertical_distance_cm = calculate_vertical_distance_cm(left_shoulder, left_ear, frame.shape[0])
-                angle = calculate_angle(left_ear, left_shoulder)
-                adjusted_angle = adjust_angle(angle)
-                angle_status = evaluate_angle_condition(adjusted_angle)
+                angle = calculate_angle(left_shoulder, left_ear) # 귀 -> 어깨 방향
+                angle_status = evaluate_angle_condition(angle)
 
-                landmarks_info.append((left_shoulder, left_ear, vertical_distance_cm, adjusted_angle))
+                landmarks_info.append((left_shoulder, left_ear, vertical_distance_cm, angle))
                 angle_conditions.append(angle_status)
 
     status_frequencies = Counter(angle_conditions)
     cap.release()
+    
     return np.array(images), landmarks_info, dict(status_frequencies)
